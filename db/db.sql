@@ -43,25 +43,25 @@ INSERT INTO SENSOR_PARAMETERS values('7','1014','0','Weight',0,1000,'KG');
 
 --Select query of DashBoard
 
-SELECT
-  sv.device_id AS "Device ID",
-  MAX(CASE WHEN sp.reg_add = '0' And sv.slave_id = '3' THEN sv.value END) AS "R",
-  MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '3' THEN sv.value END) AS "Y",
-  MAX(CASE WHEN sp.reg_add = '4' And sv.slave_id ='3' THEN sv.value END) AS "B",
-  MAX(CASE WHEN sp.reg_add = '56' AND sv.slave_id ='3' THEN sv.value END) AS "Frequency",
-  MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '2' THEN sv.value END) AS "Ph",
-  MAX(CASE WHEN sp.reg_add = '3' And sv.slave_id = '2' THEN sv.value END) AS "Temperature",
-   MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id='7' THEN sv.value END) AS "Weight",
-  TO_CHAR(MAX(sv.u_time), 'YYYY-MM-DD HH24:MI') AS "Time"
-FROM
-  sensor_value sv
-JOIN
-  sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
-WHERE
-  sv.device_id = '1014'
-GROUP BY
-  sv.device_id, TO_CHAR(sv.u_time, 'YYYY-MM-DD HH24:MI')
-ORDER BY
-  "Time" LIMIT -1;
+ SELECT
+    sv.device_id AS "device_id",
+    MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '3' THEN sv.value END) AS "r",
+    MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '3' THEN sv.value END) AS "y",
+    MAX(CASE WHEN sp.reg_add = '4' AND sv.slave_id = '3' THEN sv.value END) AS "b",
+    MAX(CASE WHEN sp.reg_add = '56' AND sv.slave_id = '3' THEN sv.value END) AS "frequency",
+    MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '2' THEN sv.value END) AS "ph",
+    MAX(CASE WHEN sp.reg_add = '3' AND sv.slave_id = '2' THEN sv.value END) AS "temperature",
+    MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '7' THEN sv.value END) AS "weight",
+    MAX(sv.d_time) AS "dtime"
+    FROM
+        sensor_value sv
+    JOIN
+        sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
+    WHERE
+        sv.device_id = '1014'
+    GROUP BY
+        sv.device_id, sv.d_time
+    ORDER BY
+        "dtime" DESC;
 
 

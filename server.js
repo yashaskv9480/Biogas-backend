@@ -90,17 +90,17 @@ app.get("/api/v1/sensor_values", async (req, res) => {
     MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '2' THEN sv.value END) AS "ph",
     MAX(CASE WHEN sp.reg_add = '3' AND sv.slave_id = '2' THEN sv.value END) AS "temperature",
     MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '7' THEN sv.value END) AS "weight",
-    MAX(sv.d_time) AS "dtime"
-    FROM
-        sensor_value sv
-    JOIN
-        sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
-    WHERE
-        sv.device_id = '1014'
-    GROUP BY
-        sv.device_id, sv.d_time
-    ORDER BY
-        "dtime" DESC;
+    MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
+FROM
+    sensor_value sv
+JOIN
+    sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
+WHERE
+    sv.device_id = '1014'
+GROUP BY
+    sv.device_id, sv.d_time
+ORDER BY
+    "dtime" DESC;
 
     `);
 
@@ -123,18 +123,19 @@ app.get("/api/v1/dashboard", async(req,res) =>{
         MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '2' THEN sv.value END) AS "ph",
         MAX(CASE WHEN sp.reg_add = '3' AND sv.slave_id = '2' THEN sv.value END) AS "temperature",
         MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '7' THEN sv.value END) AS "weight",
-        MAX(sv.d_time) AS "dtime"
-        FROM
-            sensor_value sv
-        JOIN
-            sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
-        WHERE
-            sv.device_id = '1014'
-        GROUP BY
-            sv.device_id, sv.d_time
-        ORDER BY
-            "dtime" DESC
-        LIMIT 1; 
+        MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
+    FROM
+        sensor_value sv
+    JOIN
+        sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
+    WHERE
+        sv.device_id = '1014'
+    GROUP BY
+        sv.device_id, sv.d_time
+    ORDER BY
+        "dtime" DESC
+    LIMIT 1;
+    
     `)
     res.status(200).json(result.rows)
     }
