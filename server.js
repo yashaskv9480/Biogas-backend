@@ -23,60 +23,148 @@ const authenticateJWT = (req, res, next) => {
 };
 
 app.post("/api/v1/login", async (req, res) => {
-    try {
-        const { email, password } = req.body
-        const result = await db.query("SELECT uid FROM user_details WHERE email=($1) AND password=($2)", [email, password])
-        const user = result.rows[0];
-        console.log(req.body)
-        if (user) {
-            if (email == "admin@mail.com")
-                result.rows[0].type = "admin"
-            const token = jwt.sign({ id: user.uid, useremail: email }, secretKey);
-            return res.status(200).json({"token" : token, "type": result.rows[0].type, "uid": result.rows[0].uid})
-           
-        
-        }
-    
-        return res.status(404).json({"message":404});
-    } catch (err) {
-        console.log(err.message)
-        return res.status(500).json({ error: err.message });
-    }
-})
+  try {
+      const { email, password } = req.body;
+      const result = await db.query("SELECT uid FROM user_details WHERE email=($1) AND password=($2)", [email, password]);
+      const user = result.rows[0];
+
+      if (user) {
+          let userType;
+          if (email === "admin@gmail.com") {
+              userType = "admin";
+          } else {
+              const result2 = await db.query("SELECT role FROM user_role_management WHERE uid = $1", [user.uid]);
+              userType = result2.rows[0].role;
+          }
+          const token = jwt.sign({ id: user.uid, useremail: email }, secretKey);
+          const responseObj = {
+              "token": token,
+              "type": userType,
+              "uid": user.uid
+          };
+
+          return res.status(200).json(responseObj);
+      }
+      return res.status(404).json({ "message": 404 });
+  } catch (err) {
+      console.log(err.message);
+      return res.status(500).json({ error: err.message });
+  }
+});
+
+
+
 
 app.get('/api/v1/authenticate', authenticateJWT, (req, res) => {
     res.status(200).json({ message: 'Valid User 👍' });
 });
 
-
-app.get("/api/v1/devices",async (req,res) =>{
-    try{
-        const result = await db.query("Select * from device")
-
-
-        res.status(200).json(result.rows)
-    }
-    catch(err){
-        console.log(err);
-    }
+app.get("/api/v1/getdevices",async (req,res) =>{
+  try{
+      const result = await db.query(`Select * from device`)
+      res.status(200).json(result.rows)
+  }
+  catch(err){
+      console.log(err);
+  }
 })
+
+app.get("/api/v1/userdetails/:uid", async (req, res) => {
+  try {
+    const uid = req.params.uid; 
+    const response = await db.query("SELECT name,email FROM user_details WHERE uid = $1", [uid]);
+    res.json(response.rows);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 app.post("/api/v1/adddevice",async (req,res) => {
-    try{
-        const { device_id, longitude, latitude, description } = req.body;
-        const values = [device_id, longitude, latitude, description];
-        const query = "INSERT INTO device (device_id, logitude, latitude, description) VALUES ($1, $2, $3, $4)";
-        const result = await db.query(query, values);
-        console.log(res.status(200).json({
-            "message" : "success"
-        }));
+  try{
+      const { device_id, longitude, latitude, description } = req.body;
+      const values = [device_id, longitude, latitude, description];
+      const query = "INSERT INTO device (device_id, logitude, latitude, description) VALUES ($1, $2, $3, $4)";
+      const result = await db.query(query, values);
+      console.log(res.status(200).json({
+          "message" : "success"
+      }));
 
-    }
-    catch(err){
-        console.log(err)
-        res.send(err.message)
-    }
+  }
+  catch(err){
+      console.log(err)
+      res.send(err.message)
+  }
 })
+
+app.delete("/api/v1/deletedevice/:device_id", async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const deletemanager = await db.query("DELETE FROM device WHERE device_id = $1", [
+      device_id
+    ]);
+    res.json("Device was deleted!");
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+
+app.get("/api/v1/getmanagers",async (req,res) =>{
+  try{
+      const result = await db.query(`SELECT u.uid, u.name,u.address, u.mobile, u.email
+      FROM user_details u
+      JOIN user_role_management ur ON u.uid = ur.uid
+      WHERE ur.role = 'manager' ;        
+      `)
+
+
+      res.status(200).json(result.rows)
+  }
+  catch(err){
+      console.log(err);
+  }
+})
+
+app.post("/api/v1/addmanager",async (req,res) => {
+  try{
+      const { name,password,address,mobile,email,adminId,role } = req.body;
+      const values = [name,password,address,mobile,email];
+      const query = `INSERT INTO user_details (name, password, address, mobile, email)
+      VALUES ($1,$2,$3,$4,$5)
+      RETURNING uid;`;
+      const result = await db.query(query, values);
+      const uid = result.rows[0].uid;
+      const values2 = [uid,adminId,role]
+      console.log(uid,adminId,role)
+      const query2 = `Insert INTO user_role_management(uid,admin_id,role)
+      Values ($1,$2,$3) `
+      const result2 = await db.query(query2,values2)
+      console.log(res.status(200).json({
+          "message" : "success",
+      }));
+  }
+  catch(err){
+      console.log(err.me)
+      res.send(err.message)
+  }
+})
+
+app.delete("/api/v1/deletemanager/:uid", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const deleterole = await db.query ("DELETE from user_role_management where uid = $1",[uid]);
+    const deletemanager = await db.query("DELETE FROM user_details WHERE uid = $1", [
+      uid
+    ]);
+    res.json("Manager was deleted!");
+  } catch (err) {
+    console.log(err.message);
+  }
+});
+
+
+
 
 app.get("/api/v1/sensor_values", async (req, res) => {
   try {
