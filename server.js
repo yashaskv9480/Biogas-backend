@@ -204,6 +204,30 @@ app.put('/api/v1/todo/:id', async (req, res) => {
     }
   });
 
+  app.post("/api/v1/weight-logging", async(req,res) => {
+    try{
+      const response = await db.query`Insert into weight_logging SELECT
+      sv.device_id, sv.slave_id, sv.reg_add, sv.value, sv.u_time, sv.d_time
+    FROM sensor_value sv
+    WHERE sv.slave_id = '7'
+    ORDER BY sv.u_time DESC limit 1;`
+      res.status(200).json("Sucessfully Inserted");
+  }catch(err){
+    console.log(err.message);
+  }
+  })
+
+  app.get("/api/v1/weight-logging", async(req,res) => {
+    try{
+      const response = await db.query`Select * from weight_logging`;
+      res.status(200).json(response.rows);
+    }catch(err){
+      console.log(err.message)
+      res.status(err.message)
+    }
+  })
+
+
 
 app.listen(port,() => {
     console.log(`Listening on port ${port}`)

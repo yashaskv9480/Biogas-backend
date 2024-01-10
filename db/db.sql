@@ -22,6 +22,18 @@ CREATE TABLE todo (
   end_date DATE
 );
 
+CREATE TABLE Weight_logging (
+    DEVICE_ID VARCHAR(20),
+    SLAVE_ID VARCHAR(10),
+    REG_ADD VARCHAR(10),
+    VALUE FLOAT,
+    U_TIME TIMESTAMP,
+    D_TTIME VARCHAR(25),
+    PRIMARY KEY (DEVICE_ID, SLAVE_ID, REG_ADD, U_TIME),
+    FOREIGN KEY (DEVICE_ID, REG_ADD, SLAVE_ID) REFERENCES SENSOR_PARAMETERS(DEVICE_ID, REG_ADD, SLAVE_ID)
+);
+
+
 --Insert into user_details
 
 Insert into user_details VALUES(001,'admin','admin123','RVCE','12345678','admin@gmail.com')
@@ -64,4 +76,10 @@ INSERT INTO SENSOR_PARAMETERS values('7','1014','0','Weight',0,1000,'KG');
     ORDER BY
         "dtime" DESC;
 
+--Insert into Weight_Logging
+Insert into weight_logging SELECT
+  sv.device_id, sv.slave_id, sv.reg_add, sv.value, sv.u_time, sv.d_time
+FROM sensor_value sv
+WHERE sv.slave_id = '7'
+ORDER BY sv.u_time DESC limit 1;
 
