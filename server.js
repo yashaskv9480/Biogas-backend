@@ -21,7 +21,6 @@ const authenticateJWT = (req, res, next) => {
         next();
     });
 };
-
 app.post("/api/v1/login", async (req, res) => {
     try {
         const { email, password } = req.body
@@ -29,9 +28,10 @@ app.post("/api/v1/login", async (req, res) => {
         const user = result.rows[0];
         console.log(req.body)
         if (user) {
-            if (email == "admin@mail.com")
+            if (email == "admin@gmail.com")
                 result.rows[0].type = "admin"
             const token = jwt.sign({ id: user.uid, useremail: email }, secretKey);
+            console.log("Sucess")
             return res.status(200).json({"token" : token, "type": result.rows[0].type, "uid": result.rows[0].uid})
            
         
