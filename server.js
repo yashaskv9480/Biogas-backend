@@ -3,7 +3,7 @@ const cors = require('cors')
 const app = express();
 const port = process.env.PORT || 3500
 const db = require("./db/dbconnect.js")
-const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken')
 
 const secretKey = process.env.AUTH_KEY;
 
@@ -328,5 +328,6 @@ app.put('/api/v1/todo/:id', async (req, res) => {
 
 
 app.listen(port,() => {
-    console.log(`Listening on port 3500`)
+    console.log(`Listening on port ${port}`)
 })
+
