@@ -36,11 +36,9 @@ app.post("/api/v1/login", async (req, res) => {
               const result2 = await db.query("SELECT role FROM user_role_management WHERE uid = $1", [user.uid]);
               userType = result2.rows[0].role;
           }
-          const token = jwt.sign({ id: user.uid, useremail: email }, secretKey);
+          const token = jwt.sign({ id: user.uid, useremail: email,type: userType }, secretKey);
           const responseObj = {
               "token": token,
-              "type": userType,
-              "uid": user.uid
           };
 
           return res.status(200).json(responseObj);
