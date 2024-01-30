@@ -25,8 +25,9 @@ const authenticateJWT = (req, res, next) => {
 app.post("/api/v1/login", async (req, res) => {
   try {
       const { email, password } = req.body;
-      const result = await db.query("SELECT uid FROM user_details WHERE email=($1) AND password=($2)", [email, password]);
+      const result = await db.query("SELECT uid,name,address,mobile,email FROM user_details WHERE email=($1) AND password=($2)", [email, password]);
       const user = result.rows[0];
+      console.log(user)
 
       if (user) {
           let userType;
@@ -36,7 +37,7 @@ app.post("/api/v1/login", async (req, res) => {
               const result2 = await db.query("SELECT role FROM user_role_management WHERE uid = $1", [user.uid]);
               userType = result2.rows[0].role;
           }
-          const token = jwt.sign({ id: user.uid, useremail: email,type: userType }, secretKey);
+          const token = jwt.sign({ id: user.uid,name:user.name,address:user.address,mobile:user.mobile,email:user.email,type: userType }, secretKey);
           const responseObj = {
               "token": token,
           };
@@ -57,6 +58,7 @@ app.get('/api/v1/authenticate', authenticateJWT, (req, res) => {
     res.status(200).json({ message: 'Valid User 👍' });
 });
 
+
 app.get("/api/v1/getdevices",async (req,res) =>{
   try{
       const result = await db.query(`Select * from device`)
@@ -66,6 +68,7 @@ app.get("/api/v1/getdevices",async (req,res) =>{
       console.log(err);
   }
 })
+
 
 app.get("/api/v1/userdetails/:uid", async (req, res) => {
   try {
