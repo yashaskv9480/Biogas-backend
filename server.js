@@ -327,6 +327,39 @@ app.put('/api/v1/todo/:id', async (req, res) => {
     }
   })
 
+app.post("/api/v1/add-slave/:device_id",async(req,res) => {
+  try{
+    const {device_id} = req.params;
+    const {slave_id,reg_add,keys,minvalue,maxvalue,siunit} = req.body;
+    const query = `Insert into sensor_parameters(slave_id,device_id,reg_add,keys,minvalue,maxvalue,siunit) Values ($1,$2,$3,$4,$5,$6,$7)  `;
+    const values = [slave_id,device_id,reg_add,keys,minvalue,maxvalue,siunit]
+    const result = await db.query(query,values)
+    console.log(result.message) 
+      res.status(200).json({message:"Successfully added"})
+
+  }
+  catch(err){
+    res.status(500).json({message:"Failed"});
+    console.log(err)
+  }
+})
+
+app.delete("/api/v1/delete-slave/:device_id/:slave_id/:reg_add", async (req, res) => {
+  try {
+    const { device_id, slave_id, reg_add } = req.params;
+
+    const query = `DELETE FROM sensor_parameters WHERE device_id = $1 AND slave_id = $2 AND reg_add = $3`;
+    const values = [device_id, slave_id, reg_add];
+
+    const result = await db.query(query, values);
+    console.log(result);
+    res.status(200).json({message: "Successfully deleted"})
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to delete" });
+  }
+});
+
 
 app.listen(port,() => {
     console.log(`Listening on port ${port}`)
