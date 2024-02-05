@@ -59,15 +59,33 @@ app.get('/api/v1/authenticate', authenticateJWT, (req, res) => {
 });
 
 
-app.get("/api/v1/getdevices",async (req,res) =>{
-  try{
-      const result = await db.query(`Select * from device`)
+app.get("/api/v1/getdevices", async (req, res) => {
+  try {
+    const token = req.header("Authorization");
+
+    const decodedToken = jwt.verify(token, secretKey);
+    const uid = decodedToken.id;
+    if(uid == 1) {
+               const result = await db.query(`Select * from device`)
       res.status(200).json(result.rows)
+    }
+    else {   
+             const query = `
+              SELECT d.*
+              FROM device d
+              JOIN device_management dm ON d.device_id = dm.device_id
+              WHERE dm.uid = $1 AND dm.access = $2`;
+
+            const values = [uid, 1];
+
+            const result = await db.query(query, values);
+            res.status(200).json(result.rows);
+          }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch devices" });
   }
-  catch(err){
-      console.log(err);
-  }
-})
+});
 
 
 app.get("/api/v1/userdetails/:uid", async (req, res) => {
@@ -357,6 +375,19 @@ app.delete("/api/v1/delete-slave/:device_id/:slave_id/:reg_add", async (req, res
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to delete" });
+  }
+});
+
+app.post("/api/v1/device-management", async (req, res) => {
+  try {
+    const { uid, device_id } = req.body; 
+    const query = `INSERT INTO device_management (uid, device_id,access) VALUES ($1, $2,$3)`;
+    const values = [uid, device_id,1];
+    await db.query(query, values);
+    res.status(201).json({ message: "Data inserted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to insert data" });
   }
 });
 
