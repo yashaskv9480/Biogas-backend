@@ -5,53 +5,53 @@ const port = process.env.PORT || 3500
 const db = require("./db/dbconnect.js")
 const jwt = require('jsonwebtoken')
 
+
 const secretKey = process.env.AUTH_KEY;
 
 app.use(cors())
 app.use(express.json())
 
 // Middleware to authenticate JWT tokens
-const authenticateJWT = (req, res, next) => {
-    const token = req.header('Authorization');
-    if (!token) return res.sendStatus(401);
+  const authenticateJWT = (req, res, next) => {
+      const token = req.header('Authorization');
+      if (!token) return res.sendStatus(401);
 
-    jwt.verify(token, secretKey, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-    });
-};
+      jwt.verify(token, secretKey, (err, user) => {
+          if (err) return res.sendStatus(403);
+          req.user = user;
+          next();
+      }); 
+  };
 
-app.post("/api/v1/login", async (req, res) => {
-  try {
-      const { email, password } = req.body;
-      const result = await db.query("SELECT uid,name,address,mobile,email FROM user_details WHERE email=($1) AND password=($2)", [email, password]);
-      const user = result.rows[0];
-      console.log(user)
+  app.post("/api/v1/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        console.log(email,password)
+        const result = await db.query("SELECT uid,name,address,mobile,email FROM user_details WHERE email=($1) AND password=($2)", [email, password]);
+        const user = result.rows[0];
+        console.log(user)
 
-      if (user) {
-          let userType;
-          if (email === "admin@gmail.com") {
-              userType = "admin";
-          } else {
-              const result2 = await db.query("SELECT role FROM user_role_management WHERE uid = $1", [user.uid]);
-              userType = result2.rows[0].role;
-          }
-          const token = jwt.sign({ id: user.uid,name:user.name,address:user.address,mobile:user.mobile,email:user.email,type: userType }, secretKey);
-          const responseObj = {
-              "token": token,
-          };
+        if (user) {
+            let userType;
+            if (email === "admin@gmail.com") {
+                userType = "admin";
+            } else {
+                const result2 = await db.query("SELECT role FROM user_role_management WHERE uid = $1", [user.uid]);
+                userType = result2.rows[0].role;
+            }
+            const token = jwt.sign({ id: user.uid,name:user.name,address:user.address,mobile:user.mobile,email:user.email,type: userType }, secretKey);
+            const responseObj = {
+                "token": token,
+            };
 
-          return res.status(200).json(responseObj);
-      }
-      return res.status(404).json({ "message": 404 });
-  } catch (err) {
-      console.log(err.message);
-      return res.status(500).json({ error: err.message });
-  }
-});
-
-
+            return res.status(200).json(responseObj);
+        }
+        return res.status(404).json({ "message": 404 });
+    } catch (err) {
+        console.log(err.message);
+        return res.status(500).json({ error: err.message });
+    }
+  });
 
 
 app.get('/api/v1/authenticate', authenticateJWT, (req, res) => {
@@ -219,7 +219,7 @@ ORDER BY
   }
 });
 
-app.get("/api/v1/dashboard", async(req,res) =>{
+app.get("/api/v1/dashboard/", async(req,res) =>{
     try{
         const result = await db.query(` SELECT
         sv.device_id AS "device_id",
@@ -251,7 +251,61 @@ app.get("/api/v1/dashboard", async(req,res) =>{
     }
 })
 
-//create a todo
+
+app.get("/api/v1/dashboard/:device_id", async (req, res) => {
+  try {
+      const device_id = req.params.device_id;
+      const sensorParamsQuery = await db.query(`
+          SELECT
+              device_id,
+              slave_id,
+              array_agg(reg_add ORDER BY reg_add) AS reg_addresses
+          FROM
+              sensor_parameters
+          WHERE
+              device_id = $1
+          GROUP BY
+              device_id, slave_id
+      `, [device_id]);
+      const sensorParams = sensorParamsQuery.rows;
+      const queries = sensorParams.map(params => {
+          const { slave_id, reg_addresses } = params;
+          const selectClauses = reg_addresses.map((reg_add, index) => `
+              MAX(CASE WHEN sp.reg_add = $${index + 1} AND sv.slave_id = $${reg_addresses.length + 1} THEN sv.value END) AS "${reg_add}"`
+          ).join(',');
+          return {
+              text: `
+                  SELECT
+                      sv.device_id AS "device_id",
+                      ${selectClauses},
+                      MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
+                  FROM
+                      sensor_value sv
+                  JOIN
+                      sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id
+                  WHERE
+                      sv.device_id = $${reg_addresses.length + 2}
+                  GROUP BY
+                      sv.device_id, sv.d_time
+                  ORDER BY
+                      "dtime" DESC
+                  LIMIT 1;
+              `,
+              values: [...reg_addresses, slave_id, device_id]
+          };
+      });
+
+      const results = await Promise.all(queries.map(query => db.query(query.text, query.values)));
+
+      res.status(200).json(results.map(result => result.rows[0]));
+
+  } catch (err) {
+      console.error(err.message);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
 app.post("/api/v1/todo", async (req, res) => {
     try {
       const { user_name, description,end_date} = req.body;
@@ -267,7 +321,6 @@ app.post("/api/v1/todo", async (req, res) => {
     }
   });
 
-// Update a todo's completion status
 app.put('/api/v1/todo/:id', async (req, res) => {
     try {
       const { id } = req.params;
@@ -286,7 +339,6 @@ app.put('/api/v1/todo/:id', async (req, res) => {
   });
   
   
-  //get all todos
   
   app.get("/api/v1/todo", async (req, res) => {
     try {
@@ -297,7 +349,6 @@ app.put('/api/v1/todo/:id', async (req, res) => {
     }
   });
   
-  //delete a todo
   
   app.delete("/api/v1/todo/:id", async (req, res) => {
     try {
