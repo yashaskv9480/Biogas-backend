@@ -251,59 +251,59 @@ app.get("/api/v1/dashboard/", async(req,res) =>{
     }
 })
 
-
-app.get("/api/v1/dashboard/:device_id", async (req, res) => {
-  try {
-      const device_id = req.params.device_id;
+app.get("/api/v1/dashboard/:deviceid", async (req, res) => {
+  try { 
+      const deviceId = req.params.deviceid;
+      const query = `
+      SELECT
+          slave_id,
+          array_agg(reg_add ORDER BY reg_add) AS reg_addresses,
+          array_agg(keys ORDER BY reg_add) AS keys
+      FROM
+          sensor_parameters
+      WHERE
+          device_id = $1
+      GROUP BY
+          slave_id
+      `;
+      
+     const result = await db.query(query, [deviceId]);
       const sensorParamsQuery = await db.query(`
           SELECT
-              device_id,
-              slave_id,
-              array_agg(reg_add ORDER BY reg_add) AS reg_addresses
+              sv.device_id AS "device_id",
+              ${generateSelectClauses(result.rows)},
+              MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
           FROM
-              sensor_parameters
+              sensor_value sv
+          JOIN
+              sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
           WHERE
-              device_id = $1
+              sv.device_id = $1
           GROUP BY
-              device_id, slave_id
-      `, [device_id]);
-      const sensorParams = sensorParamsQuery.rows;
-      const queries = sensorParams.map(params => {
-          const { slave_id, reg_addresses } = params;
-          const selectClauses = reg_addresses.map((reg_add, index) => `
-              MAX(CASE WHEN sp.reg_add = $${index + 1} AND sv.slave_id = $${reg_addresses.length + 1} THEN sv.value END) AS "${reg_add}"`
-          ).join(',');
-          return {
-              text: `
-                  SELECT
-                      sv.device_id AS "device_id",
-                      ${selectClauses},
-                      MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
-                  FROM
-                      sensor_value sv
-                  JOIN
-                      sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id
-                  WHERE
-                      sv.device_id = $${reg_addresses.length + 2}
-                  GROUP BY
-                      sv.device_id, sv.d_time
-                  ORDER BY
-                      "dtime" DESC
-                  LIMIT 1;
-              `,
-              values: [...reg_addresses, slave_id, device_id]
-          };
-      });
+              sv.device_id, sv.d_time
+          ORDER BY
+              "dtime" DESC
+          LIMIT 1;
+      `, [deviceId]);
 
-      const results = await Promise.all(queries.map(query => db.query(query.text, query.values)));
-
-      res.status(200).json(results.map(result => result.rows[0]));
-
+      res.status(200).json(sensorParamsQuery.rows);
   } catch (err) {
       console.error(err.message);
       res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
+function generateSelectClauses(sensorParams) {
+      const selectClauses = sensorParams.map(params => {
+      const { slave_id, reg_addresses, keys } = params;
+      return reg_addresses.map((reg_add, index) => `
+          MAX(CASE WHEN sp.reg_add = '${reg_add}' AND sv.slave_id = '${slave_id}' THEN sv.value END) AS "${keys[index]}"`).join(',');
+  }).join(',');
+
+  return selectClauses;
+}
+
+
 
 
 app.post("/api/v1/todo", async (req, res) => {
