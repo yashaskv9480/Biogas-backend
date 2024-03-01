@@ -59,7 +59,7 @@ app.get('/api/v1/authenticate', authenticateJWT, (req, res) => {
 });
 
 
-app.get("/api/v1/getdevices", async (req, res) => {
+app.get("/api/v1/getdevices",authenticateJWT,async (req, res) => {
   try {
     const token = req.header("Authorization");
 
@@ -67,6 +67,7 @@ app.get("/api/v1/getdevices", async (req, res) => {
     const uid = decodedToken.id;
     if(uid == 1) {
                const result = await db.query(`Select * from device`)
+               console.log(result.rows)
       res.status(200).json(result.rows)
     }
     else {   
