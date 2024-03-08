@@ -443,12 +443,41 @@ app.post("/api/v1/device-management", async (req, res) => {
   }
 });
 
+app.get("/api/v1/device-management", async (req, res) => {  
+  try {
+    const query = "SELECT u.name, de.description, d.*FROM device_management d INNER JOIN user_details u ON u.uid = d.uid INNER JOIN device de ON de.device_id = d.device_id";
+    const response = await db.query(query);
+    res.status(200).json(response.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch data" });
+  }
+});
+
+
 app.get('/api/v1/view-slave/:device_Id', async(req, res) => {
   try{
     const {device_Id} = req.params;
     console.log(device_Id)
-    const query = `Select * from sensor_parameters where device_id = $1`
+    const query = `SELECT slave_id, device_id, reg_add, keys, minvalue, maxvalue, siunit
+    FROM sensor_parameters
+    WHERE device_id = $1
+    GROUP BY slave_id, device_id, reg_add, keys, minvalue, maxvalue, siunit;
+    `
     const response = await db.query(query,[device_Id]);
+    res.json(response.rows).status(200);  
+    console.log(response.rows)
+  }
+  catch(err){
+    res.json({message: err.message}).status(500)
+    console.log(err)
+  }
+})
+
+app.get('/api/v1/users', async(req, res) => {
+  try{
+    const query = `select * from user_details`;
+    const response = await db.query(query);
     res.json(response.rows).status(200);
     console.log(response.rows)
   }
@@ -458,6 +487,18 @@ app.get('/api/v1/view-slave/:device_Id', async(req, res) => {
   }
 })
 
+app.get('/api/v1/devices', async(req, res) => {
+  try{
+    const query = `select * from device`;
+    const response = await db.query(query);
+    res.json(response.rows).status(200);
+    console.log(response.rows)
+  }
+  catch(err){
+    res.json({message: err.message}).status(500)
+    console.log(err)
+  }
+})
 
 app.listen(port,() => {
     console.log(`Listening on port ${port}`)
