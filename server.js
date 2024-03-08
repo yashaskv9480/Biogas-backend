@@ -256,7 +256,7 @@ app.get("/api/v1/dashboard/:deviceid", async (req, res) => {
   try { 
       const deviceId = req.params.deviceid;
       const query = `
-      SELECT
+      SELECT  
           slave_id,
           array_agg(reg_add ORDER BY reg_add) AS reg_addresses,
           array_agg(keys ORDER BY reg_add) AS keys
@@ -406,7 +406,6 @@ app.post("/api/v1/add-slave/:device_id",async(req,res) => {
     const result = await db.query(query,values)
     console.log(result.message) 
       res.status(200).json({message:"Successfully added"})
-
   }
   catch(err){
     res.status(500).json({message:"Failed"});
@@ -415,12 +414,13 @@ app.post("/api/v1/add-slave/:device_id",async(req,res) => {
 })
 
 app.delete("/api/v1/delete-slave/:device_id/:slave_id/:reg_add", async (req, res) => {
-  try {
+  try { 
     const { device_id, slave_id, reg_add } = req.params;
-
+    const query1 = `DELETE FROM sensor_value WHERE device_id = $1 AND slave_id = $2 AND reg_add = $3`
     const query = `DELETE FROM sensor_parameters WHERE device_id = $1 AND slave_id = $2 AND reg_add = $3`;
     const values = [device_id, slave_id, reg_add];
 
+    const result1 = await db.query(query1,values);
     const result = await db.query(query, values);
     console.log(result);
     res.status(200).json({message: "Successfully deleted"})
@@ -442,6 +442,21 @@ app.post("/api/v1/device-management", async (req, res) => {
     res.status(500).json({ message: "Failed to insert data" });
   }
 });
+
+app.get('/api/v1/view-slave/:device_Id', async(req, res) => {
+  try{
+    const {device_Id} = req.params;
+    console.log(device_Id)
+    const query = `Select * from sensor_parameters where device_id = $1`
+    const response = await db.query(query,[device_Id]);
+    res.json(response.rows).status(200);
+    console.log(response.rows)
+  }
+  catch(err){
+    res.json({message: err.message}).status(500)
+    console.log(err)
+  }
+})
 
 
 app.listen(port,() => {
