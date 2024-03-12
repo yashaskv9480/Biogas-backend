@@ -146,7 +146,7 @@ app.get("/api/v1/getmanagers",async (req,res) =>{
   }
 })
 
-app.post("/api/v1/addmanager",async (req,res) => {
+app.post("/api/v1/add_manager_user",async (req,res) => {
   try{
       const { name,password,address,mobile,email,adminId,role } = req.body;
       const values = [name,password,address,mobile,email];
@@ -160,6 +160,11 @@ app.post("/api/v1/addmanager",async (req,res) => {
       const query2 = `Insert INTO user_role_management(uid,admin_id,role)
       Values ($1,$2,$3) `
       const result2 = await db.query(query2,values2)
+      if(adminId  != 1){
+        const query1 = `INSERT INTO user_role_management(uid, admin_id, role)
+        VALUES ($1, 1, $3)`;
+      await pool.query(query1, [uid, role]);
+      }
       console.log(res.status(200).json({
           "message" : "success",
       }));
@@ -170,21 +175,35 @@ app.post("/api/v1/addmanager",async (req,res) => {
   }
 })
 
-app.delete("/api/v1/deletemanager/:uid", async (req, res) => {
+app.delete("/api/v1/delete_manager_user/:uid", async (req, res) => {
   try {
     const { uid } = req.params;
-    const deleterole = await db.query ("DELETE from user_role_management where uid = $1",[uid]);
-    const deletemanager = await db.query("DELETE FROM user_details WHERE uid = $1", [
+    const admin_id = uid;
+    await db.query("Delete from device_management where uid = $1",[uid])
+    await db.query ("DELETE from user_role_management where uid = $1 or admin_id = $2",[uid,admin_id]);
+    await db.query("DELETE FROM user_details WHERE uid = $1", [
       uid
-    ]);
-    res.json("Manager was deleted!");
+  ]);
+    res.json("Manager was deleted!").status(200);
   } catch (err) {
     console.log(err.message);
   }
 });
 
 
-
+app.get("/api/v1/getusers",async (req,res) =>{
+  try{
+      const result = await db.query(`SELECT u.uid, u.name,u.address, u.mobile, u.email
+      FROM user_details u
+      JOIN user_role_management ur ON u.uid = ur.uid
+      WHERE ur.role = 'user' ;        
+      `)  
+      res.status(200).json(result.rows)
+  }
+  catch(err){
+      console.log(err);
+  }
+})
 
 app.get("/api/v1/sensor_values", async (req, res) => {
   try {
