@@ -205,72 +205,6 @@ app.get("/api/v1/getusers",async (req,res) =>{
   }
 })
 
-app.get("/api/v1/sensor_values", async (req, res) => {
-  try {
-    const result = await db.query(`
-    SELECT
-    sv.device_id AS "device_id",
-    MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '3' THEN sv.value END) AS "r",
-    MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '3' THEN sv.value END) AS "y",
-    MAX(CASE WHEN sp.reg_add = '4' AND sv.slave_id = '3' THEN sv.value END) AS "b",
-    MAX(CASE WHEN sp.reg_add = '56' AND sv.slave_id = '3' THEN sv.value END) AS "frequency",
-    MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '2' THEN sv.value END) AS "ph",
-    MAX(CASE WHEN sp.reg_add = '3' AND sv.slave_id = '2' THEN sv.value END) AS "temperature",
-    MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '7' THEN sv.value END) AS "weight",
-    MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
-FROM
-    sensor_value sv
-JOIN
-    sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
-WHERE
-    sv.device_id = '1014'
-GROUP BY
-    sv.device_id, sv.d_time
-ORDER BY
-    "dtime" DESC;
-
-    `);
-
-    console.log(result.rows);
-    res.json(result.rows);
-  } catch (err) {
-    console.log(err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/api/v1/dashboard/", async(req,res) =>{
-    try{
-        const result = await db.query(` SELECT
-        sv.device_id AS "device_id",
-        MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '3' THEN sv.value END) AS "r",
-        MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '3' THEN sv.value END) AS "y",
-        MAX(CASE WHEN sp.reg_add = '4' AND sv.slave_id = '3' THEN sv.value END) AS "b",
-        MAX(CASE WHEN sp.reg_add = '56' AND sv.slave_id = '3' THEN sv.value END) AS "frequency",
-        MAX(CASE WHEN sp.reg_add = '2' AND sv.slave_id = '2' THEN sv.value END) AS "ph",
-        MAX(CASE WHEN sp.reg_add = '3' AND sv.slave_id = '2' THEN sv.value END) AS "temperature",
-        MAX(CASE WHEN sp.reg_add = '0' AND sv.slave_id = '7' THEN sv.value END) AS "weight",
-        MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
-    FROM
-        sensor_value sv
-    JOIN
-        sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
-    WHERE
-        sv.device_id = '1014'
-    GROUP BY
-        sv.device_id, sv.d_time
-    ORDER BY
-        "dtime" DESC
-    LIMIT 1;
-    
-    `)
-    res.status(200).json(result.rows)
-    }
-    catch(err){
-        console.log(err.message)
-    }
-})
-
 app.get("/api/v1/dashboard/:deviceid", async (req, res) => {
   try { 
       const deviceId = req.params.deviceid;
@@ -304,6 +238,47 @@ app.get("/api/v1/dashboard/:deviceid", async (req, res) => {
           ORDER BY
               "dtime" DESC
           LIMIT 1;
+      `, [deviceId]);
+
+      res.status(200).json(sensorParamsQuery.rows);
+  } catch (err) {
+      console.error(err.message);
+      res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.get("/api/v1/sensor_values/:deviceid", async (req, res) => {
+  try { 
+      const deviceId = req.params.deviceid;
+      const query = `
+      SELECT  
+          slave_id,
+          array_agg(reg_add ORDER BY reg_add) AS reg_addresses,
+          array_agg(keys ORDER BY reg_add) AS keys
+      FROM
+          sensor_parameters
+      WHERE
+          device_id = $1
+      GROUP BY
+          slave_id
+      `;
+      
+     const result = await db.query(query, [deviceId]);
+      const sensorParamsQuery = await db.query(`
+          SELECT
+              sv.device_id AS "device_id",
+              ${generateSelectClauses(result.rows)},
+              MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
+          FROM
+              sensor_value sv
+          JOIN
+              sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
+          WHERE
+              sv.device_id = $1
+          GROUP BY
+              sv.device_id, sv.d_time
+          ORDER BY
+              "dtime" DESC;
       `, [deviceId]);
 
       res.status(200).json(sensorParamsQuery.rows);
@@ -382,21 +357,23 @@ app.put('/api/v1/todo/:id', async (req, res) => {
     }
   });
 
-  app.post("/api/v1/weight-logging", async (req, res) => {
+  app.post("/api/v1/weight-logging/:deviceId", async (req, res) => {
     try {
+      const {deviceId} = req.params;
       const result = await db.query (`INSERT INTO weight_logging
-        SELECT
-          sv.device_id,
-          sv.slave_id,
-          sv.reg_add,
-          sv.value,
-          sv.u_time,
-          sv.d_time
-        FROM sensor_value sv
-        WHERE sv.slave_id = '7'
-        ORDER BY sv.u_time DESC
-        LIMIT 1;
-      `);
+          SELECT
+            sv.device_id,
+            sv.slave_id,
+            sv.reg_add,
+            sv.value,
+            sv.u_time,
+            sv.d_time
+          FROM sensor_value sv
+          WHERE sv.slave_id = '7' and 
+          sv.device_id = $1
+          ORDER BY sv.u_time DESC
+          LIMIT 1;
+      `, [deviceId]);
       res.status(200).json({ message: "Successfully Inserted",});
       
     } catch (err) {
@@ -406,9 +383,11 @@ app.put('/api/v1/todo/:id', async (req, res) => {
   });
   
   
-  app.get("/api/v1/weight-logging", async(req,res) => {
+  app.get("/api/v1/weight-logging/:deviceId", async(req,res) => {
     try{
-      const response = await db.query(`Select device_id,value,d_time from weight_logging`)
+      const {deviceId} = req.params
+      console.log(deviceId)
+      const response = await db.query(`Select device_id,value,d_time from weight_logging where device_id = $1`, [deviceId])
       res.status(200).json(response.rows);
     }catch(err){
       console.log(err.message)
