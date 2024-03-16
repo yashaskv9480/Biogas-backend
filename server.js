@@ -205,47 +205,6 @@ app.get("/api/v1/getusers",async (req,res) =>{
   }
 })
 
-app.get("/api/v1/dashboard/:deviceid", async (req, res) => {
-  try { 
-      const deviceId = req.params.deviceid;
-      const query = `
-      SELECT  
-          slave_id,
-          array_agg(reg_add ORDER BY reg_add) AS reg_addresses,
-          array_agg(keys ORDER BY reg_add) AS keys
-      FROM
-          sensor_parameters
-      WHERE
-          device_id = $1
-      GROUP BY
-          slave_id
-      `;
-      
-     const result = await db.query(query, [deviceId]);
-      const sensorParamsQuery = await db.query(`
-          SELECT
-              sv.device_id AS "device_id",
-              ${generateSelectClauses(result.rows)},
-              MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
-          FROM
-              sensor_value sv
-          JOIN
-              sensor_parameters sp ON sv.device_id = sp.device_id AND sv.slave_id = sp.slave_id AND sv.reg_add = sp.reg_add
-          WHERE
-              sv.device_id = $1
-          GROUP BY
-              sv.device_id, sv.d_time
-          ORDER BY
-              "dtime" DESC
-          LIMIT 1;
-      `, [deviceId]);
-
-      res.status(200).json(sensorParamsQuery.rows);
-  } catch (err) {
-      console.error(err.message);
-      res.status(500).json({ error: "Internal Server Error" });
-  }
-});
 
 app.get("/api/v1/sensor_values/:deviceid", async (req, res) => {
   try { 
@@ -266,9 +225,10 @@ app.get("/api/v1/sensor_values/:deviceid", async (req, res) => {
      const result = await db.query(query, [deviceId]);
       const sensorParamsQuery = await db.query(`
           SELECT
-              sv.device_id AS "device_id",
+              sv.device_id AS "device_id",  
               ${generateSelectClauses(result.rows)},
-              MAX(TO_TIMESTAMP(sv.d_time, 'DD/MM/YY HH24:MI:SS')) AS "dtime"
+              MAX(sv.d_time) AS "dtime"
+
           FROM
               sensor_value sv
           JOIN
@@ -288,6 +248,7 @@ app.get("/api/v1/sensor_values/:deviceid", async (req, res) => {
   }
 });
 
+
 function generateSelectClauses(sensorParams) {
       const selectClauses = sensorParams.map(params => {
       const { slave_id, reg_addresses, keys } = params;
@@ -298,8 +259,32 @@ function generateSelectClauses(sensorParams) {
   return selectClauses;
 }
 
+app.get("/api/v1/dashboard/:keys/:deviceId", async (req, res) => {
+  const { keys, deviceId } = req.params;
 
+  try {
+      const query = `
+          SELECT device_id, slave_id, reg_add, value, d_time 
+          FROM sensor_value 
+          WHERE (device_id, slave_id, reg_add) IN (
+              SELECT device_id, slave_id, reg_add 
+              FROM sensor_parameters 
+              WHERE keys = $1 AND device_id = $2
+          )
+          ORDER BY d_time DESC 
+          LIMIT 1;
+      `;
 
+      const result = await db.query(query, [keys, deviceId]);
+      console.log(result.rows)
+      
+      res.json(result.rows[0]); 
+
+  } catch (error) {
+      console.error('Error executing query:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 app.post("/api/v1/todo", async (req, res) => {
     try {
@@ -371,7 +356,7 @@ app.put('/api/v1/todo/:id', async (req, res) => {
           FROM sensor_value sv
           WHERE sv.slave_id = '7' and 
           sv.device_id = $1
-          ORDER BY sv.u_time DESC
+          ORDER BY sv.u_time DESC 
           LIMIT 1;
       `, [deviceId]);
       res.status(200).json({ message: "Successfully Inserted",});
@@ -501,4 +486,3 @@ app.get('/api/v1/devices', async(req, res) => {
 app.listen(port,() => {
     console.log(`Listening on port ${port}`)
 })
-
