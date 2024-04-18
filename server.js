@@ -11,7 +11,6 @@ const secretKey = process.env.AUTH_KEY;
 app.use(cors())
 app.use(express.json())
 
-// Middleware to authenticate JWT tokens
   const authenticateJWT = (req, res, next) => {
       const token = req.header('Authorization');
       if (!token) return res.sendStatus(401);
@@ -480,6 +479,20 @@ app.get('/api/v1/devices', async(req, res) => {
   catch(err){
     res.json({message: err.message}).status(500)
     console.log(err)
+  }
+})
+
+app.get('/api/v1/overview', async(req,res) => {
+  try{
+    const result = await db.query(`SELECT
+    (SELECT COUNT(*) FROM user_role_management WHERE role = 'manager') AS manager_count,
+    (SELECT COUNT(*) FROM device) AS device_count,
+    (SELECT COUNT(*) FROM user_details) AS user_count;
+`)
+    res.status(200).json(result.rows)
+  }
+  catch(err){
+    res.status(500).json({message: err.message})
   }
 })
 
